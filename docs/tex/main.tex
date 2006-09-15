@@ -1,0 +1,77 @@
+%% LaTex Source for PyOPC
+%% created by Hermann Himmelbauer
+%% July 2006
+\documentclass[11pt,a4paper]{article}
+\usepackage{epsfig}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{listings}
+\usepackage{html}
+
+%% Preferences for the listings.sty package
+\lstset{%basicstyle=\scriptsize\ttfamily,
+	basicstyle=\small,
+        tabsize=2,
+	float=tbph,
+        showspaces=false,
+	aboveskip=\bigskipamount,
+        numbers=left,
+        numberstyle=\tiny, 
+	breaklines=true,
+        stepnumber=2, 
+        numbersep=5pt,
+        captionpos=b}
+
+% topmargin DVI -3mm, PS mit ghostviewausgedruck +4mm , PDF -13mm
+\setlength{\topmargin}{-13mm}
+\setlength{\oddsidemargin}{5mm}
+\setlength{\evensidemargin}{5mm}
+\setlength{\textwidth}{155mm} 
+\setlength{\textheight}{230mm}
+
+% Space between figure and caption
+\setlength{\abovecaptionskip}{-2pt}
+
+%% Abbrevations for common words
+
+\begin{document}
+
+\pagestyle{empty}
+\input{title}
+\newpage
+
+\pagestyle{plain}
+\pagenumbering{Roman}
+\setcounter{page}{1}
+\tableofcontents
+\newpage
+
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\pagestyle{headings} 
+
+%% 1 Introduction
+\input{introduction}
+\newpage
+
+%% 2 Basic PyOPC concepts
+\input{concepts}
+\newpage
+
+%% 3 Client specifics
+\input{client}
+\newpage
+
+%% 4 Server specifics
+\input{server}
+\newpage
+
+\begin{appendix}
+
+\input{appendix_a}
+\newpage
+
+\input{bibliography}
+\newpage 
+\end{appendix}
+\end{document}

@@ -1,0 +1,162 @@
+<?xml version="1.0" ?>
+<fanconfig>
+<!-- 
+This file configures fieldbus data for the ESD Simulation server.
+The fieldbus is hierarchically structured with:
+<fantype>
+  <fanid>
+    <node>
+      <datapoint>
+      </datapoint>
+    </node>
+  </fanid>
+</fantype>
+Every hierarchical element has an attribute "id".
+############## Node elements ################
+"nsid_str" - FAN specific node self identification string
+"opt1_str" - FAN sepcific node location string, hex-encoded
+"opt2_str" - FAN specific node program ID, hex-encoded
+
+############## Datapoint elements #############
+"canonical" - Canonical data type of the fieldbus value
+              The ESDSim Server will encode the value accordingly as follows:
+float   - Encodings "BINHEX", "STRING", "SCALARBIN"
+time    - Encodings "BINHEX", "STRING", "TIME"
+string  - Encodings "BINHEX", "STRING"
+Any other canonical type (e.g. binhex, but also int) will result
+in a "BINHEX" encoding only.
+
+"value" - Fieldbus value in its canonical data type
+
+"datatype" - FAN-specific data type (integer format), has no impact on ESD
+
+"access" - outlines the accessibility of the data point an may
+           have a value of "RW" and "RO"
+
+"delay"  - specifies the time between the request and response to simulate
+           a slow fieldbus network
+
+"dp_name" - FAN specific datapoint name
+"sid_str" - FAN specific self identification string
+-->
+<fantype id="LON">
+  <fanid id="GATE1">
+    <node id="01:02:03:04:05:06">
+      <nsid_str>Test Node 1</nsid_str>
+      <opt1_str>01 02 03 04</opt1_str>
+      <opt2_str>05 02 30 bf</opt2_str>
+        <datapoint id="11">
+	  <canonical>float</canonical>
+	  <value>12.2</value>
+	  <datatype>114</datatype>
+	  <access>RW</access>
+	  <delay>0.5</delay>
+	  <dp_name>nvoLedFb</dp_name>
+	  <sid_str>LED1 Feedback</sid_str>
+        </datapoint>
+        <datapoint id="12">
+	  <canonical>float</canonical>
+	  <value>25.5</value>
+	  <datatype>114</datatype>
+	  <access>RW</access>
+	  <delay>0.5</delay>
+	  <dp_name>nvoLedFb</dp_name>
+	  <sid_str>LED2 Feedback</sid_str>
+        </datapoint>
+        <datapoint id="13">
+	  <canonical>string</canonical>
+	  <value>System is online</value>
+	  <datatype>115</datatype>
+	  <access>RO</access>
+	  <delay>0.5</delay>
+	  <dp_name>Display</dp_name>
+	  <sid_str>Status Display</sid_str>
+        </datapoint>
+    </node>
+    <node id="01:02:03:04:05:07">
+      <nsid_str>Test Node 2</nsid_str>
+      <opt1_str>01 02 03 04</opt1_str>
+      <opt2_str>05 02 30 bf</opt2_str>
+        <datapoint id="11">
+	  <canonical>float</canonical>
+	  <value>1</value>
+	  <datatype>116</datatype>
+	  <access>RO</access>
+	  <delay>0.5</delay>
+	  <dp_name>nvoDoorStat</dp_name>
+	  <sid_str>Garage door status</sid_str>
+        </datapoint>
+        <datapoint id="12">
+	  <canonical>float</canonical>
+	  <value>1</value>
+	  <datatype>114</datatype>
+	  <access>RW</access>
+	  <delay>0.5</delay>
+	  <dp_name>nvoSwitch</dp_name>
+	  <sid_str>Garage Door Switch</sid_str>
+        </datapoint>
+        <datapoint id="13">
+	  <canonical>time</canonical>
+	  <value>9999.123</value>
+	  <datatype>118</datatype>
+	  <access>RO</access>
+	  <delay>0.5</delay>
+	  <dp_name>nvoTime</dp_name>
+	  <sid_str>Last Opened</sid_str>
+        </datapoint>
+    </node>
+  </fanid>
+  <fanid id="GATE2">
+    <node id="01:02:03:04:08:06">
+      <nsid_str>Test Node 23</nsid_str>
+      <opt1_str>01 02 03 04</opt1_str>
+      <opt2_str>05 02 30 bf</opt2_str>
+        <datapoint id="11">
+	  <canonical>binhex</canonical>
+	  <value>öwelkfnaäpoej</value>
+	  <datatype>110</datatype>
+	  <delay>3</delay>
+	  <access>RW</access>
+	  <dp_name>nvoTest</dp_name>
+	  <sid_str>Fridge Status with Delay</sid_str>
+        </datapoint>
+    </node>
+  </fanid>
+</fantype>
+<fantype id="CUSTOM">
+  <fanid id="NASA1">
+    <node id="01:02:05:04:05:06">
+      <nsid_str>Rocket Launcher</nsid_str>
+      <opt1_str>01 02 03 04</opt1_str>
+      <opt2_str>05 02 30 bf</opt2_str>
+        <datapoint id="11">
+	  <canonical>float</canonical>
+	  <value>0</value>
+	  <datatype>235</datatype>
+	  <access>RW</access>
+	  <delay>15</delay>
+	  <dp_name>RLaunchButton</dp_name>
+	  <sid_str>Launch Button</sid_str>
+        </datapoint>
+    </node>
+  </fanid>
+</fantype>
+<fantype id="TEST">
+  <fanid id="GATE1">
+    <node id="01:02:05:04:05:06">
+      <nsid_str>No Delay</nsid_str>
+      <opt1_str>01 02 03 04</opt1_str>
+      <opt2_str>05 02 30 bf</opt2_str>
+        <datapoint id="11">
+	  <canonical>float</canonical>
+	  <value>0</value>
+	  <datatype>235</datatype>
+	  <access>RW</access>
+	  <delay>0</delay>
+	  <dp_name>test</dp_name>
+	  <sid_str>test</sid_str>
+        </datapoint>
+    </node>
+  </fanid>
+</fantype>
+</fanconfig>

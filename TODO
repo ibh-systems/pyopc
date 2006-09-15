@@ -1,0 +1,33 @@
+- Try to fix Python memory errors: change XML Parse, upgrade to Python 2.5... 
+- Implement Data conversion
+- Automatic Sub-Item Properties
+- Browsing: Implement MaxElementsReturned/ContinuationPoint
+            and BrowseFilter/ElementNameFilter/VendorFilter
+            if possible in the server
+- Implement a sample XML-File Server that reads items from a XML-File
+- Check for missing Success/Error Codes of all OPC functions
+- Implement microseconds/Timezones in the ZSI
+- Implement "ValueTypeQualifier"
+- Implement "Decimal" data type in ZSI
+- Check "base64Binary" - what exactly is it, how could it be implemented
+- Implement lists in lists
+- HasChanged should also work for lists
+- Implement RequestDeadline
+- Implement deadband for datetime/time etc.
+- Add Caching stragegies for subscription-sampling reads
+- Try to prevent multiple sampling-reads on one item by blocking multiple
+  reads and by creating an "intelligent" MaxSamplingRate
+- Implement a optional periodic function purge_cache that deletes
+  obsoleted entries from the ReadCache (e.g. older than 24 hours)
+
+######## Ideas ##########
+- Create a sample OPC-Browser with a Web-Interface based on Twisted
+- Implement a Web Interface for the OPC Server with the following features:
+  - Server-specific configuration (shutdown etc.)
+  - Adding/Removing OPC Servers in the hierarchy
+  - Configuring global and specific options of the server
+- Add a ssh-interface with similar options as above 
+  (Maybe there are some ideas in twisted?)
+  - Add a manhole to this ssh-access
+- Add SSL (Client/Server)
+- Add User Management, Authorization etc. 

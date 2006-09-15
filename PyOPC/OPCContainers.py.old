@@ -1,0 +1,1143 @@
+#! /usr/bin/env python
+
+'''OPC XMLDA 1.0 messages module
+This module contains several messages for constructing requests/responses
+for OPC operations such as Read/Write/Browse etc.'''
+
+import decimal,datetime
+import ZSI
+
+def python2xsd(var):
+    ''' Function that returns xsd-schemas for given objects '''
+    
+    XSDPRE='xsd:'
+    OPCARRAYPRE='ns1:ArrayOf'
+    
+    trans=((basestring,'string','String'),
+           (int,'int','Int'),
+           (long,'long','Long'),
+           (bool,'boolean','Boolean'),
+           (float,'double','Double'),
+           (decimal.Decimal,'decimal','Decimal'),
+           (datetime.datetime,'dateTime','DateTime'),
+           (datetime.time,'time',None),
+           (datetime.date,'date',None),
+           (datetime.timedelta,'duration',None))
+
+    if isinstance(var,type):
+        # somebody did a python2xsd(type(var))
+        for t in trans:
+            if issubclass(var,t[0]):
+                return XSDPRE+t[1]
+        # Unknown type, hence raise TypeError
+        raise TypeError('Type %s cannot be mapped to XML Schema type' \
+                        % var)
+
+    if isinstance(var,list) or isinstance(var,tuple):
+        # A list/tuple with items is given
+        try:
+            v=var[0]
+        except IndexError:
+            raise TypeError("Plain List/Tuple types are not accepted,"
+                            "specify something like ['a'] instead!")
+        for t in trans:
+            if isinstance(v,t[0]):
+                return OPCARRAYPRE+t[2]
+        # Unknown type, hence raise TypeError
+        raise TypeError('Type %s cannot be mapped to XML Schema type' \
+                        % type(var))
+            
+    # Test parameter "var" directly
+    for t in trans:
+        if isinstance(var,t[0]):
+            return XSDPRE+t[1]
+
+    # Everything failed, raise an error
+    raise TypeError('Type %s cannot be mapped to XML Schema type' \
+                    % type(var))
+
+
+# This comes from the Python cookbook, page 240 or also
+# http://herlock.com/ob/pythoncb/0596007973/chp-6-sect-3.html
+def no_new_attributes(wrapped_setattr):
+    """ raise an error on attempts to add a new attribute, while
+        allowing existing attributes to be set to new values.
+    """
+    def __setattr__(self, name, value):
+        if hasattr(self, name):    # not a new attribute, allow setting
+            wrapped_setattr(self, name, value)
+        else:                      # a new attribute, forbid adding it
+            raise AttributeError("can't add attribute %r to %s" % (name, self))
+    return __setattr__
+class NoNewAttrs(object):
+    """ subclasses of NoNewAttrs inhibit addition of new attributes, while
+        allowing existing attributed to be set to new values.
+    """
+    # block the addition new attributes to instances of this class
+    __setattr__ = no_new_attributes(object.__setattr__)
+    class __metaclass__(type):
+        " simple custom metaclass to block adding new attributes to this class "
+        __setattr__ = no_new_attributes(type.__setattr__)
+
+
+# All possible OPC Errors / Success codes
+# Success Codes
+OPC_S_CLAMP = 'S_CLAMP'
+OPC_S_DATAQUEUEOVERFLOW = 'S_DATAQUEUEOVERFLOW'
+OPC_S_UNSUPPORTEDRATE = 'S_UNSUPPORTEDRATE'
+
+# Error Codes
+OPC_E_ACCESS_DENIED = 'E_'
+OPC_E_BUSY = 'E_'
+OPC_E_FAIL = 'E_'
+OPC_E_INVALIDCONTINUATIONPOINT = 'E_'
+OPC_E_INVALIDFILTER = 'E_INVALIDFILTER'
+OPC_E_INVALIDHOLDTIME = 'E_INVALIDHOLDTIME'
+OPC_E_INVALIDITEMNAME = 'E_INVALIDITEMNAME'
+OPC_E_INVALIDITEMPATH = 'E_INVALIDITEMPATH'
+OPC_E_INVALIDPID = 'E_INVALIDPID'
+OPC_E_NOSUBSCRIPTION = 'E_NOSUBSCRIPTION'
+OPC_E_NOTSUPPORTED = 'E_NOTSUPPORTED'
+OPC_E_OUTOFMEMORY = 'E_OUTOFMEMORY'
+OPC_E_RANGE = 'E_RANGE'
+OPC_E_BADTYPE = 'E_BADTYPE'
+OPC_E_READONLY = 'E_READONLY'
+OPC_E_SERVERSTATE = 'E_SERVERSTATE'
+OPC_E_TIMEDOUT = 'E_TIMEDOUT'
+OPC_E_UNKNOWNITEMNAME = 'E_UNKNOWNITEMNAME'
+OPC_E_UNKNOWNITEMPATH = 'E_UNKNOWNITEMPATH'
+OPC_E_WRITEONLY = 'E_WRITEONLY'
+
+
+def extr_soap_type(tc):
+    ''' Returns the element tag name a typecode represents
+    Probably an xsi:complex type '''
+    buf = str(tc.typecode)
+    # Has the following format:
+    # '<OpcXmlDaSrv_services_types.ItemValue_Def object at 0x407f87cc>'
+    # Therefore strip everything left before '.' and right after '_'
+    buf = buf[buf.index('.')+1:buf.rindex('_')]
+    return buf
+
+class OPCServerError(ZSI.ZSIException):
+    # FIXME this should be done better?
+    pass
+
+
+
+class PropertyTuple(tuple):
+    ''' Class that holds "Property tuples" with named elements:
+    (Value,Description,ItemPath,ItemName,ResultID,ErrorText)'''
+    
+    properties = ('Value',
+                  'Description',
+                  'ItemPath',
+                  'ItemName',
+                  'ResultID',
+                  'ErrorText')
+
+    def __new__(self,*args,**kwds):
+        if len(args) != len(self.properties):
+            # Set the tuple from keywords
+            args = []
+            for key in self.properties:
+                # append keyvalue or None
+                args.append(kwds.get(key,None))
+        return tuple.__new__(self,args)
+        
+    
+    def __init__(self,*args,**kwds):
+        ''' Add all arguments as function attributes '''
+        tuple.__init__(self,args)
+        for index, attr_name in enumerate(self.properties):
+            #From Python cookbook -> not working
+            #setattr(self, attr_name, property(itemgetter(index)))
+            setattr(self, attr_name, self.__getitem__(index))
+
+class PropertyContainer(dict):
+    ''' An object holding OPC Item Properties '''
+
+    def __setitem__(self, key, value):
+        ''' Only values of type PropertyTuple are allowed '''
+
+        if not isinstance(value,PropertyTuple):
+            raise TypeError('Values must be instances of PropertyTuples')
+        else:
+            dict.__setitem__(self,key,value)
+
+class OPCBasic(object):
+    ''' A class that defines basic functions for other OPC classes '''
+
+    def check_IClist(IClist):
+        ''' Check if the given list contains only ItemContainers and
+        expand possible sublists '''
+        for item in IClist:
+            if isinstance(item,list):
+                # Only one level, therefore recursion is not used
+                for subitem in item:
+                    if isinstance(subitem,ItemContainer):
+                        yield subitem
+                    else:
+                        raise AttributeError(\
+                              'Parameter is not of type ItemContainer')
+            elif isinstance(item,ItemContainer):
+                yield item
+            else:
+                raise AttributeError,(
+                      'Parameter is not of type ItemContainer')
+            
+    def fill_tcattrs(self,tc,attrs,Options):
+        ''' Add element attributes to given typcode '''
+        
+        if getattr(tc,'_attrs',None) == None:
+            tc._attrs={}
+
+        for attr in attrs:
+            # Either get them from the function parameters or
+            # - if not available - from the object
+            value = Options.pop(attr,getattr(self,attr))
+            if value != None:
+                # If value == None (NOT '', [], there's a difference!
+                # the attribute is set
+                # Some attributes have to be converted in some way
+                # ReqType 
+                if attr == 'ReqType':
+                    tc._attrs[attr] = python2xsd(value)
+                else:
+                    tc._attrs[attr] = value
+
+
+    def read_tcattrs(self,tc,attrs,d):
+        ''' Read element attributes from typecode into given dictionary '''
+        if getattr(tc,'_attrs',None):
+            # Check if there is an attribute dictionary
+            for attr in attrs:
+                # Try to read attribute
+                value = tc._attrs.get(attr,None)
+                if value != None:
+                    d[attr] = value
+
+    def read_tcelts(self,tc,elts,d):
+        ''' Read element values from typecode into given dictionary '''
+        for elt in elts:
+            # Try to read element
+            value = getattr(tc,elt,None)
+            if value != None:
+                d[elt] = value
+
+
+class OPCOperation(OPCBasic):
+    ''' Class that sets and reads OPC Operation typecodes '''
+
+    # The following attributes serve as default values.
+    # They will be automatically added to various SOAP messages
+    # unless overridden.
+    # If the value is "None", but NOT '' or [], they will not
+    # be added as attributes in the SOAP message,
+    # which means that the default value is assumed.
+
+    # Address of the OPC server
+    OPCServerAddress = ''
+
+    # Default Locale which will be used for requests
+    LocaleID = 'en-us'
+    
+    # Outlines if a text will be added in case of errors
+    # Defaults to True for Request options
+    # Default to False for Browse and GetProperties requests
+    ReturnErrorText = None
+    # If True, a diagnostic text will be added in case of errors
+    ReturnDiagnosticInfo = None
+    
+    # Absolute time until a request must be sent back
+    RequestDeadline = None
+    
+    # Outlines if the timestamp of a value should be returned
+    ReturnItemTime = None
+
+    # This has to be true as if not set dispatching does not work
+    ReturnItemPath = True
+    ReturnItemName = True
+
+    # GlobalItemPath/ItemName
+    ItemPath = None
+    ItemName = None
+
+    # arbitrary string that has to be sent back
+    ClientRequestHandle = None
+
+    # Indicates if Values are returned in Write response messages
+    ReturnValuesOnReply = False
+
+    # Outlines the datatype the values should be returned
+    ReqType = None
+
+    # Maximum Age of data during Read operations
+    MaxAge = None
+
+    # Attributes for Subscribing
+    SubscriptionPingRate = None
+    Deadband = None
+    RequestedSamplingRate = None
+    EnableBuffering = None
+    ServerSubHandle = None
+    RevisedSamplingRate = None
+    HoldTime = None
+    WaitTime = None
+    ReturnAllItems = None
+
+    # Attributes for Browsing
+    ContinuationPoint = None
+    MaxElementsReturned = None
+    BrowseFilter = None
+    ElementNameFilter = None
+    VendorFilter = None
+    ReturnAllProperties = None
+    ReturnPropertyValues = None
+    ReturnErrorText = None
+
+
+    # Private variables
+    _loc = None
+    _portType = None
+    
+
+    def fill_tc(self, tc, IClist, Options):
+        ''' Accepts a typecode and an Options Dictionary '''
+
+        
+        # Call the right function for this typecode
+        buf = extr_soap_type(tc)
+        func = getattr(self,'fill_'+buf,None)
+
+        if func:
+            # call proper function
+            func(tc, IClist, Options)
+        else:
+            # ItemContainer does not provide a proper fill function for
+            # this typecode
+            raise AttributeError,'Unknown complex type %s for filling'%buf
+
+
+    def read_tc(self, tc):
+        ''' Accepts a typecode  '''
+
+        # Call the right function for this typecode
+        buf = extr_soap_type(tc)
+        func = getattr(self,'read_'+buf,None)
+
+        if func:
+            # call proper function
+            return func(tc)
+        else:
+            # ItemContainer does not provide a proper read function for
+            # this typecode
+            raise AttributeError,'Unknown complex type %s for reading'%buf
+
+
+    def fill_RequestOptions(self, tc, IClist, Options):
+        ''' Fill request options typecode '''
+
+        # Custom attributes
+        self.fill_tcattrs(tc,('ReturnErrorText',
+                              'ReturnDiagnosticInfo',
+                              'ReturnItemTime',
+                              'ReturnItemPath',
+                              'ReturnItemName',
+                              'RequestDeadline',
+                              'ClientRequestHandle',
+                              'LocaleID'),
+                          Options)
+        
+    def fill_GetStatus(self, tc, IClist, Options):
+        ''' Fill GetStatus Operation '''
+        # Set some attributes
+        self.fill_tcattrs(tc,('LocaleID',
+                              'ClientRequestHandle'),
+                         Options)
+
+    def read_ReplyBase(self,tc):
+        ''' Read ReplyBase '''
+
+        rb = {}
+
+        self.read_tcattrs(tc,('RcvTime',
+                              'ReplyTime',
+                              'ClientRequestHandle',
+                              'RevisedLocaleID',
+                              'ServerState'),
+                          rb)
+
+        return rb
+    
+
+    def read_GetStatusResponse(self, tc):
+        ''' Read GetStatusResponse '''
+        # The ReplyDictionary
+        ReplyDict = {}
+        # copy Reply base into ReplyDictionary
+        ReplyDict.update(self.read_ReplyBase(tc.GetStatusResult))
+
+        # Add attributes from the Status message
+        self.read_tcattrs(tc.Status,('StartTime',
+                                     'ProductVersion'),
+                          ReplyDict)
+
+        # Now add various elements
+        self.read_tcelts(tc.Status,('StatusInfo',
+                                    'VendorInfo',
+                                    'SupportedLocaleIDs',
+                                    'SupportedInterfaceVersions'),
+                         ReplyDict)
+        
+        return [], ReplyDict
+
+    def fill_Read(self, tc, IClist, Options):
+        ''' Fill Read Operation '''
+
+        ReqHandleBase = self.ClientRequestHandle+'_ReadItem_'
+
+        op = tc.new_Options()
+        tc.Options = op
+        self.fill_RequestOptions(op, [], Options)
+
+        # Create and add the ItemList
+        item_list = tc.new_ItemList()
+        tc.ItemList = item_list
+
+        # Set some attributes
+        self.fill_tcattrs(tc.ItemList,('ItemPath',
+                                       'MaxAge',
+                                       'ReqType'),
+                          Options)
+
+        for i,item in enumerate(self.check_IClist(IClist)):
+            item_tc = item_list.new_Items()
+
+            # Override some ItemContainer attributes
+            # Set a unique item handle 
+            item.ClientItemHandle = ReqHandleBase+str(i)
+
+            # Set attributes on typecode according to item
+            item.fill_tc(item_tc)
+            
+            # Now append it to the item list
+            item_list.Items.append(item_tc)
+
+        
+    def read_ReadResponse(self, tc):
+        ''' Read Read Response '''
+
+         # The ReplyDictionary
+        ReplyDict = {}
+        # copy Reply base into ReplyDictionary
+        ReplyDict = dict(tc.ReadResult._attrs)
+        
+        # First build an error dictionary
+        error_dict={}
+        for error in tc.Errors:
+            error_dict[error.get_attribute_ID()] = error.Text
+
+        # Fill the item List
+        ilist=[]
+
+        for item in tc.RItemList.Items:
+            ilist.append(ItemContainer(item,error_dict))
+            
+        return ilist, ReplyDict
+
+    def fill_Write(self, tc, IClist, Options):
+
+        ''' Fill Write Operation '''
+        ReqHandleBase = self.ClientRequestHandle+'_ItemWrite_'
+
+        # Make request options
+        op = tc.new_Options()
+        tc.Options = op
+        self.fill_RequestOptions(op,[],Options)
+
+        # Set required attribute ReturnValuesOnReply with default "False"
+        # Set some attributes
+        tc.set_attribute_ReturnValuesOnReply(\
+            Options.pop('ReturnValuesOnReply',False))
+
+        item_list = tc.new_ItemList()
+        tc.ItemList = item_list
+
+        # Set attributes of ItemList
+        value = Options.pop('ItemPath',self.ItemPath)
+        if value != None:
+            tc.ItemList.set_attribute_ItemPath(value)
+
+        # Now fill the request
+        for i,item in enumerate(self.check_IClist(IClist)):
+            item_tc = item_list.new_Items()
+
+            # Override some ItemContainer attributes
+            # Set a unique item handle 
+            item.ClientItemHandle = ReqHandleBase+str(i)
+
+            # Set attributes on typecode according to item
+            item.fill_tc(item_tc)
+            
+            # Now append it to the item list
+            item_list.Items.append(item_tc)
+        
+
+    def read_WriteResponse(self, tc):
+        ''' Read Write Response '''
+        # The ReplyDictionary
+        ReplyDict = {}
+        # copy Reply base into ReplyDictionary
+        ReplyDict = dict(tc.WriteResult._attrs)
+        
+        # First build an error dictionary
+        error_dict={}
+        for error in tc.Errors:
+            error_dict[error.get_attribute_ID()] = error.Text
+
+        # Fill the item List
+        ilist=[]
+
+        for item in tc.RItemList.Items:
+            ilist.append(ItemContainer(item,error_dict))
+            
+        return ilist,ReplyDict
+
+    def fill_Subscribe(self, tc, IClist, Options):
+        ''' Fill Subscribe Operation '''
+        ReqHandleBase = self.ClientRequestHandle+'_SubscribeItem_'
+        
+        # Make request options
+        op = tc.new_Options()
+        tc.Options = op
+        self.fill_RequestOptions(op,[],Options)
+
+        # Set required attribute ReturnValuesOnReply with default "False"
+        tc.set_attribute_ReturnValuesOnReply(\
+            Options.pop('ReturnValuesOnReply',False))
+
+        # Set SubscriptionPingRate
+        self.fill_tcattrs(tc,['SubscriptionPingRate'],Options)
+
+        item_list = tc.new_ItemList()
+        tc.ItemList = item_list
+
+        # Fill Attributes
+        self.fill_tcattrs(tc.ItemList,('ItemPath',
+                                       'Deadband',
+                                       'RequestedSamplingRate',
+                                       'EnableBuffering',
+                                       'ReqType'),
+                          Options)
+
+
+        # Add Items
+        for i,item in enumerate(self.check_IClist(IClist)):
+            item_tc = item_list.new_Items()
+
+            # Override some ItemContainer attributes
+            # Set a unique item handle 
+            item.ClientItemHandle = ReqHandleBase+str(i)
+
+            # Set attributes on typecode according to item
+            item.fill_tc(item_tc)
+            
+            # Now append it to the item list
+            item_list.Items.append(item_tc)
+
+
+    def read_SubscribeResponse(self, tc):
+        ''' Read Subscribe Response '''
+        # The ReplyDictionary
+        ReplyDict = {}
+        # copy Reply base into ReplyDictionary
+        ReplyDict = dict(tc.SubscribeResult._attrs)
+        
+        # Add Server SubHandle
+        ReplyDict['ServerSubHandle']=tc.get_attribute_ServerSubHandle()
+
+        # First build an error dictionary
+        error_dict={}
+        for error in tc.Errors:
+            error_dict[error.get_attribute_ID()] = error.Text
+
+        # Also add attributes of RItemList = SubscribeReplyItemList
+        # (which contains only RevisedSamplingRate)
+        ReplyDict['RevisedSamplingRate'] = tc.RItemList.get_attribute_RevisedSamplingRate()
+
+        # Fill the item List
+        ilist=[]
+
+        for item in tc.RItemList.Items:
+            ilist.append(ItemContainer(item,error_dict))
+            
+        return ilist, ReplyDict
+
+
+    def fill_SubscriptionPolledRefresh(self, tc, IClist, Options):
+        ''' Fill SubscriptionPolledRefresh Operation '''
+        
+        # Make request options
+        op = tc.new_Options()
+        tc.Options = op
+        self.fill_RequestOptions(op,[],Options)
+
+        # Set some attributes
+        self.fill_tcattrs(tc,('HoldTime',
+                              'WaitTime',
+                              'ReturnAllItems'),
+                          Options)
+        
+        # Add Server SubHandles
+        if Options.has_key('ServerSubHandles'):
+            pn = Options['ServerSubHandles']
+            if isinstance(pn,basestring):
+                pl = [pn]
+            else:
+                pl = list(pn)
+            try:
+                # Workaround for ZSI: before .append, element has to be added
+                tc.ServerSubHandles = pl.pop()
+            except IndexError:
+                pass
+            for p in pl:
+                tc.ServerSubHandles.append(p)
+            del Options['ServerSubHandles']
+        
+
+    def read_SubscriptionPolledRefreshResponse(self, tc):
+        ''' Read SubscriptionPolledRefreshResponse '''
+        # The ReplyDictionary
+        ReplyDict = {}
+        # copy Reply base into ReplyDictionary
+        ReplyDict = dict(tc.SubscriptionPolledRefreshResult._attrs)
+        
+        # Add DataBufferOverflow
+        ReplyDict['DataBufferOverflow']=tc.get_attribute_DataBufferOverflow()
+
+        # First build an error dictionary
+        error_dict={}
+        for error in tc.Errors:
+            error_dict[error.get_attribute_ID()] = error.Text
+
+        # Now get all invalid ServerSubHandles
+        hl = []
+        for handle in tc.InvalidServerSubHandles:
+            hl.append(handle)
+        if hl:
+            # There are invalid handles, append to ReplyDict
+            ReplyDict['InvalidServerSubHandles'] = hl
+
+        # Fill the item List
+        ilist=[]
+        
+        # Items are packed in RItemList as they have a distinct
+        # attribute "SubscriptionHandle", therefore there have to
+        # be two loops. However, there's only one item list,
+        # the "SubscriptionHandle" is simply added to the ItemContainer
+        for ritem in tc.RItemList:
+            sh = ritem.get_attribute_SubscriptionHandle()
+            for item in ritem.Items:
+                ilist.append(ItemContainer(item,error_dict,
+                                           SubscriptionHandle=sh))
+            
+        return ilist, ReplyDict
+
+    def fill_SubscriptionCancel(self, tc, IClist, Options):
+        ''' Fill SubscriptionCancel Operation '''
+
+        self.fill_tcattrs(tc,('ServerSubHandle',
+                              'ClientRequestHandle'),
+                          Options)
+
+
+    def read_SubscriptionCancelResponse(self, tc):
+        ''' Read SubscriptionCancelResponse '''
+
+        # The ReplyDictionary
+        ReplyDict = {}
+        # copy Reply base into ReplyDictionary
+        ReplyDict = dict(tc._attrs)
+
+        return [], ReplyDict
+
+
+    def fill_Browse(self, tc, IClist, Options):
+        ''' Fill Browse Operation '''
+
+        # Now add all other options to the BrowseRequest
+        self.fill_tcattrs(tc,('LocaleID',
+                              'ClientRequestHandle',
+                              'ItemPath',
+                              'ItemName',
+                              'ContinuationPoint',
+                              'MaxElementsReturned',
+                              'BrowseFilter',
+                              'ElementNameFilter',
+                              'VendorFilter',
+                              'ReturnAllProperties',
+                              'ReturnPropertyValues',
+                              'ReturnErrorText'),
+                          Options)
+        
+        # Add PropertyNames
+        if Options.has_key('PropertyNames'):
+            pn = Options['PropertyNames']
+            if isinstance(pn,basestring):
+                pl = [pn]
+            else:
+                pl = list(pn)
+            try:
+                # Workaround for ZSI: before .append, element has to be added
+                tc.PropertyNames = pl.pop()
+            except IndexError:
+                pass
+            for p in pl:
+                tc.PropertyNames.append(p)
+            del Options['PropertyNames']
+
+    def read_BrowseResponse(self, tc):
+        ''' Read Browse Response '''
+        # The ReplyDictionary
+        ReplyDict = {}
+        # copy Reply base into ReplyDictionary
+        ReplyDict = dict(tc.BrowseResult._attrs)
+        
+        # First build an error dictionary
+        error_dict={}
+        for error in tc.Errors:
+            error_dict[error.get_attribute_ID()] = error.Text
+
+        # Fill the item List
+        ellist=[]
+
+        for element in tc.Elements:
+            ellist.append(ItemContainer(element,error_dict))
+            
+        return ellist,ReplyDict
+
+    def fill_GetProperties(self, tc, IClist, Options):
+        ''' Fill GetProperties Operation '''
+
+        # Add all other options to the GetProperties Request
+        self.fill_tcattrs(tc,('LocaleID',
+                              'ClientRequestHandle',
+                              'ReturnAllProperties',
+                              'ReturnPropertyValues',
+                              'ReturnErrorText'),
+                          Options)
+
+        # Add Item IDs
+        for item in self.check_IClist(IClist):
+            item_id = tc.new_ItemIDs()
+
+            # Set attributes on typecode according to item
+            item.fill_tc(item_id)
+            
+            # Now append it to the item list
+            tc.ItemIDs.append(item_id)
+
+        # Add PropertyNames
+        if Options.has_key('PropertyNames'):
+            pl = list(Options['PropertyNames'])
+            try:
+                # Workaround for ZSI: before .append, element has to be added
+                tc.PropertyNames = pl.pop()
+            except IndexError:
+                pass
+            for p in pl:
+                tc.PropertyNames.append(p)
+            del Options['PropertyNames']
+
+
+    def read_GetPropertiesResponse(self, tc):
+        ''' Read GetPropertiesResponse Response '''
+
+        # The ReplyDictionary
+        ReplyDict = {}
+        # copy Reply base into ReplyDictionary
+        ReplyDict = dict(tc.GetPropertiesResult._attrs)
+        
+        # First build an error dictionary
+        error_dict={}
+        for error in tc.Errors:
+            error_dict[error.get_attribute_ID()] = error.Text
+
+        # Fill the item List
+        ellist=[]
+
+        for element in tc.PropertyLists:
+            ellist.append(ItemContainer(element,error_dict))
+            
+        return ellist,ReplyDict
+
+
+class ReplyBase(NoNewAttrs,OPCBasic):
+    ''' Class that holds the ReplyBase '''
+    
+
+    RcvTime=0
+    ReplyTime=0
+    ClientRequestHandle=''
+    RevisedLocaleID=''
+    ServerState=''
+
+    def __init__ (self, tc=None, error_dict=None, **kwds):
+        if tc and ('ReplyBase' in str(type(tc))):
+            # A typecode was specified
+            self.RcvTime = tc.get_attribute_RcvTime()
+            self.ReplyTime = tc.get_attribute_ReplyTime()
+            self.ClientRequestHandle = tc.get_attribute_ClientRequestHandle()
+            self.RevisedLocaleID = tc.get_attribute_RevisedLocaleID()
+            self.ServerState = tc.get_attribute_ServerState()
+
+        # Now set attributes accordings to keywords
+        # (Maybe overriding values given in the typecode)
+        for key,value in kwds.items():
+            setattr(self,key,value)
+
+    def __repr__(self):
+        return str(self.__dict__)
+
+
+    def set_tc(self,tc):
+        ''' Fill given ItemValue Typecode '''
+
+        # First set all attributes of ItemValue element
+        # The following attributes are required:
+        if not self.RcvTime or not self.ReplyTime or not self.ServerState:
+            raise AttributeError,'One or more required attributes are missing'
+        tc.set_attribute_RcvTime(self.RcvTime)
+        tc.set_attribute_ReplyTime(self.ReplyTime)
+        tc.set_attribute_ServerState(self.ServerState)
+
+        if self.ClientRequestHandle:
+            tc.set_attribute_ClientRequestHandle(self.ClientRequestHandle)
+        if self.RevisedLocaleID:
+            tc.set_attribute_RevisedLocaleID(self.RevisedLocaleID)
+
+class ItemContainer(NoNewAttrs,OPCBasic):
+    ''' Class that may be used for various requests/responses
+    Basically it holds an item specifier (ItemPath/ItemName) and
+    additional properties, such as Value, Quality etc. '''
+
+    ItemName=None
+    ItemPath=None
+
+    Value=None
+    Timestamp=None
+    ValueTypeQualifier=None
+    MaxAge=None
+    ReqType=None
+
+    ClientItemHandle=None
+
+    HasError = False
+    ResultID=None
+    DiagnosticInfo=None
+    ErrorText=None
+
+    # Quality 
+    QualityField=None
+    LimitField=None
+    VendorField=None
+    
+    # For Subscription
+    Deadband = None
+    RequestedSamplingRate = None
+    EnableBuffering = None
+    RevisedSamplingRate = None
+    SubscriptionHandle = None
+
+    # For Browse Responses
+    Name = None
+    IsItem = None
+    HasChildren = None
+
+    Properties = None      # Holds Property Containers
+
+    def __init__ (self,tc=None,error_dict=None,**kwds):
+        ''' Set object attributes from given typecode or from keywords '''
+
+        if tc:
+            # Call the right function for this typecode
+            buf = extr_soap_type(tc)
+            func = getattr(self,'read_'+buf,None)
+
+            if func:
+                # call proper function
+                func(tc,error_dict)
+            else:
+                # ItemContainer does not provide a proper read function for
+                # this typecode
+                raise AttributeError,'Unknown complex type %s for reading'%buf
+
+
+        # Now set attributes accordings to keywords
+        # (Maybe overriding values given in the typecode)
+        for key,value in kwds.items():
+            setattr(self,key,value)
+
+
+    def __str__(self):
+        return str(self.__dict__)
+
+    def fill_tcattrs(self,tc,attrs):
+        ''' Add attributes to given typcode (altered, no Options here)'''
+        OPCBasic.fill_tcattrs(self,tc,attrs,{})
+
+
+    def fill_tc(self,tc):
+        ''' Fill given typecode with values in this class '''
+
+        # Call the right function for this typecode
+
+        buf = extr_soap_type(tc)
+        func = getattr(self,'fill_'+buf,None)
+
+        if func:
+            # call proper function
+            func(tc)
+        else:
+            # ItemContainer does not provide a proper fill function for
+            # this typecode
+            raise AttributeError,'Complex type %s can not be filled' % buf
+        
+
+    def fill_ReadRequestItem(self,tc):
+        ''' Fill given ReadRequestItem with appropriate Values '''
+
+        self.fill_tcattrs(tc,('ItemName',
+                              'ItemPath',
+                              'ClientItemHandle',
+                              'MaxAge',
+                              'ReqType'))
+        
+
+    def read_ReadRequestItem(self,tc):
+        ''' Read contents of ReadRequestItem '''
+        # Not implemented
+        pass
+        
+
+    def fill_BrowseElement(self,tc):
+        ''' Fill BrowseResponse typecode from object '''
+
+        tc.set_attribute_Name(self.Name)
+        self.fill_tcattrs(tc,('ItemName',
+                             'ItemPath'))
+        
+        tc.set_attribute_IsItem(self.IsItem)
+        tc.set_attribut_HasChildren(self.HasChildren)
+
+    def read_BrowseElement(self,tc,error_dict):
+        ''' Read BrowseResponse typecode into object '''
+
+        self.Name=tc.get_attribute_Name()
+        self.ItemPath=tc.get_attribute_ItemPath()
+        self.ItemName=tc.get_attribute_ItemName()
+        self.IsItem = tc.get_attribute_IsItem()
+        self.HasChildren = tc.get_attribute_HasChildren()
+
+        # Now read all properties
+        self.Properties = PropertyContainer()
+        
+        for prp in tc.Properties:
+            # Retrieve first as it's needed below for ErrorText
+            ResultID = prp.get_attribute_ResultID()
+            
+            self.Properties[prp.get_attribute_Name()]=PropertyTuple(\
+                Value = prp.Value,
+                Description = prp.get_attribute_Description(),
+                ItemPath = prp.get_attribute_ItemPath(),
+                ItemName = prp.get_attribute_ItemName(),
+                ResultID = ResultID,
+                ErrorText = error_dict.get(ResultID,None))
+
+
+    def fill_ItemIdentifier(self,tc):
+        ''' Fill ItemIdentifier typecode from object '''
+
+        self.fill_tcattrs(tc,('ItemName',
+                              'ItemPath'))
+
+
+    def read_ItemIdentifier(self,tc,error_dict):
+        ''' Read ItemIdentifier typecode into object '''
+
+        self.ItemPath=tc.get_attribute_ItemPath()
+        self.ItemName=tc.get_attribute_ItemName()
+
+    def fill_SubscribeRequestItem(self,tc):
+        ''' Fill SubscribeRequestItem typecode from object '''
+
+        self.fill_tcattrs(tc,('ItemPath',
+                              'ItemName',
+                              'ReqType',
+                              'ClientItemHandle',
+                              'Deadband',
+                              'RequestedSamplingRate',
+                              'EnableBuffering',
+                              'ItemPath'))
+        
+
+    def read_SubscribeRequestItem(self,tc,error_dict):
+        ''' Read SubscribeRequestItem typecode into object '''
+        pass
+
+
+    def fill_PropertyReplyList(self,tc):
+        ''' Fill PropertyReplyList typecode from object '''
+        pass
+        
+    def read_PropertyReplyList(self,tc,error_dict):
+        ''' Read PropertyReplyList typecode into object '''
+
+        self.ItemPath=tc.get_attribute_ItemPath()
+        self.ItemName=tc.get_attribute_ItemName()
+            
+        resultid = tc.get_attribute_ResultID()
+        if resultid:
+            # There is an error
+            self.HasError=True
+            self.ResultID=resultid
+            self.ErrorText = error_dict.get(resultid,None)
+
+        # Now read all properties
+        self.Properties = PropertyContainer()
+        
+        for prp in tc.Properties:
+            # Retrieve first as it's needed below for ErrorText
+            ResultID = prp.get_attribute_ResultID()
+            
+            self.Properties[prp.get_attribute_Name()]=PropertyTuple(\
+                Value = prp.Value,
+                Description = prp.get_attribute_Description(),
+                ItemPath = prp.get_attribute_ItemPath(),
+                ItemName = prp.get_attribute_ItemName(),
+                ResultID = ResultID,
+                ErrorText = error_dict.get(ResultID,None))
+        
+
+    def fill_ItemValue(self,tc):
+        ''' Fill ItemValue typecode from object '''
+
+        # First set all attributes of ItemValue element
+
+        self.fill_tcattrs(tc,('ValueTypeQualifier',
+                              'ItemPath',
+                              'ItemName',
+                              'ClientItemHandle',
+                              'Timestamp',
+                              'ResultID'))
+        
+
+        # Now add and set elements
+        # The Value
+        if self.Value:
+            tc.Value = self.Value
+
+        qual = tc.new_Quality
+        tc.Quality = qual
+
+        self.fill_tcattrs(qual,('QualityField',
+                                'LimitField',
+                                'VendorField'))
+        
+        # Diagnostic info
+        # The specification is unclear if to set it if it's empty
+        # Well, so just set it anyway
+        tc.DiagnosticInfo = self.DiagnosticInfo
+        
+
+    def read_ItemValue(self,tc,error_dict):
+        ''' Read ItemValue typecode into object '''
+
+        self.ItemName=tc.get_attribute_ItemName()
+        self.ItemPath=tc.get_attribute_ItemPath()
+        self.Value=tc.Value
+        if tc.Quality:
+            # Check, if there is a Quality element before getting attrs
+            self.QualityField=tc.Quality.get_attribute_QualityField()
+            self.QualityField=tc.Quality.get_attribute_LimitField()
+            self.QualityField=tc.Quality.get_attribute_VendorField()
+
+        self.ClientItemHandle=tc.get_attribute_ClientItemHandle()
+        self.Timestamp=tc.get_attribute_Timestamp()
+        self.ValueTypeQualifier=tc.get_attribute_ValueTypeQualifier()
+        self.DiagnosticInfo=tc.DiagnosticInfo
+        resultid = tc.get_attribute_ResultID()
+        if resultid:
+            # There is an error
+            self.HasError=True
+            self.ResultID=resultid
+            self.ErrorText = error_dict.get(resultid,None)
+
+
+    def fill_SubscribeItemValue(self,tc):
+        ''' Function that handles attribute and calls fill_ItemValue '''
+
+        self.fill_tcattrs(tc,('RevisedSamplingRate'))
+        self.fill_ItemValue(tc.ItemValue)
+
+    def read_SubscribeItemValue(self,tc,error_dict):
+        ''' Function that handles attribute and calls read_ItemValue '''
+
+        self.read_ItemValue(tc.ItemValue,error_dict)
+        self.RevisedSamplingRate=tc.get_attribute_RevisedSamplingRate()
+
+    def fill_SubscribePolledRefreshReplyItemList(self,tc):
+        ''' Function that handles attribute and calls fill_ItemValue '''
+
+        self.fill_ItemValue(tc)
+
+    def read_SubscribePolledRefreshReplyItemList(self,tc,error_dict):
+        ''' Function that handles attribute and calls read_ItemValue '''
+
+        self.read_ItemValue(tc,error_dict)
+
+
+
+if __name__ == '__main__':
+    # Test some functions
+
+    # test PropertyContainer/PropertyTuple
+    p=PropertyTuple(1,'Item Value','','Lightswitch1',None,None)
+    print p
+    print p.Value
+    print p.Description
+    m=PropertyTuple(Value='rw',
+                    ItemPath='blabla')
+    print m
+    print m.Value
+    print m.ItemName
+    pc = PropertyContainer()
+    pc['Value'] = p
+    pc['Access'] = m
+    print pc
+    print pc.get('Value')
+    try:
+        pc['Test']='abc'
+    except TypeError:
+        print '"abc" cannot be appended to pc'
+
+
+    def my2xsdprint(var):
+        print var,'->',python2xsd(var)
+
+    import types
+    my2xsdprint(2)
+    my2xsdprint(type(2))
+    my2xsdprint([2,3])
+    my2xsdprint('abc')
+    my2xsdprint(type('bac'))
+    my2xsdprint(types.StringType)
+    my2xsdprint(21231233123123123123)
+    my2xsdprint(types.LongType)
+    my2xsdprint(datetime.datetime.today())
+    # produces errors
+    #my2xsdprint(set((1,2,3)))
+    #my2xsdprint([])
+
+    
