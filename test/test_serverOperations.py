@@ -91,6 +91,7 @@ class BasicOperations(unittest.TestCase,TestXDAServer):
         return d
     def _cbtestRead_Data(self,(ilist,Options)):
         for item in ilist:
+            print item.Value, self.xdasrv.OPCItemDict[mkItemKey(item)]
             self.assertEqual(item.Value,
                              self.xdasrv.OPCItemDict[mkItemKey(item)].Value)
 
@@ -331,15 +332,15 @@ class BasicOperations(unittest.TestCase,TestXDAServer):
     def _cbtestBrowse2(self,(ilist,Options)):
         self.assertEqual(len(self.xdasrv.OPCItemDict),len(ilist))
 
-    #del testGetStatus
+    del testGetStatus
     #del testRead_Data
-    #del testRead_RB
-    #del testRead_noRB
-    #del testRead_Unknown
-    #del testWrite_NoVal
-    #del testWrite_Val
-    #del testGetProperties1
-    #del testGetProperties2
-    #del testGetProperties3
-    #del testBrowse1
-    #del testBrowse2
+    del testRead_RB
+    del testRead_noRB
+    del testRead_Unknown
+    del testWrite_NoVal
+    del testWrite_Val
+    del testGetProperties1
+    del testGetProperties2
+    del testGetProperties3
+    del testBrowse1
+    del testBrowse2

@@ -1,0 +1,61 @@
+%% Description: 
+%%
+%%
+
+\section {Installation/Quickstart}
+\thispagestyle{plain}
+
+Before installing the PyOPC framework, the following three software
+packages have to be installed:
+
+\begin{description}
+\item[Python:] The Python programming language can be downloaded from
+http://www.python.org. It is available for a variety of operating systems.
+{\bf The Python version must be at least 2.4.}
+
+\item[Zolera Soap Infrastructure (ZSI):] The ZSI framework is used for
+parsing and generating the SOAP messages. It is available from
+http://pywebsvcs.sourceforge.net/. ZSI is still under development, therefore
+different releases may not work. The ZSI-2.0\_rc3 release is known to work
+with PyOPC.
+
+\item[Twisted:] The Twisted server framework is used for the server
+functionality. It is available from http://twistedmatrix.com/. All
+recently released versions should be appropriate.
+\end{description}
+
+Installation instructions for the above software packages should be
+available at the given websites.
+
+PyOPC does currently not have an installer but is nevertheless
+relatively easy to install. At first the PyOPC package has to be
+decompressed. Then Python has to be informed where to find it. This is
+done by adding the location of the PyOPC variable to the environment
+variable {\sl PYTHONPATH}.
+
+If everything is installed correctly, the next step may be to test the
+installation. PyOPC contains extensive unit tests in the subdirectory ``test''.
+These tests can either be run altogether by executing ``runtests.sh'' or 
+selectively via the ``trial'' command from the Twisted framework. Hopefully,
+all tests will pass\footnote{On some slower machines, certain server operations
+may fail as they rely on a predefined execution time of certain operations.}. 
+
+If all goes well, PyOPC is ready to use. As a quickstart, an existing
+OPC XML-DA server may be queried directly from python such as shown in
+listing \ref{ex_quickstart}\footnote{A demo server, implemented with
+PyOPC, is set up at http://violin.qwer.tk:8000/, which may, however,
+not be available all the time. There are several other public OPC
+XML-DA compliant servers available. Some addresses for such servers
+may be found at http://www.opcfoundation.org, moreover Advosol also
+offers access to some demo servers (see http://www.advosol.com).}.
+
+\lstset{language=C}
+\begin{lstlisting}[caption={Accessing a remote OPC XML-DA server}
+                   ,label=ex_quickstart] 
+from PyOPC.XDAClient import XDAClient
+
+address='http://path/to/server'
+xda = XDAClient(OPCServerAddress=address)
+xda.GetStatus()
+\end{lstlisting}
+

@@ -177,7 +177,21 @@
 
 \stepcounter{section}
 {\newpage\clearpage
-\lthtmlfigureA{figure151}%
+\lthtmlfigureA{lstlisting155}%
+\begin{lstlisting}[caption={Accessing a remote OPC XML-DA server}
+                   ,label=ex_quickstart] 
+from PyOPC.XDAClient import XDAClient
+\par
+address='http://path/to/server'
+xda = XDAClient(OPCServerAddress=address)
+xda.GetStatus()
+\end{lstlisting}%
+\lthtmlfigureZ
+\lthtmlcheckvsize\clearpage}
+
+\stepcounter{section}
+{\newpage\clearpage
+\lthtmlfigureA{figure196}%
 \begin{figure}\centering
 \includegraphics[scale=0.7]{graphics/technologies.eps}
 
@@ -187,7 +201,7 @@
 
 \stepcounter{subsection}
 {\newpage\clearpage
-\lthtmlfigureA{figure166}%
+\lthtmlfigureA{figure211}%
 \begin{figure}\centering
 \includegraphics[scale=0.7]{graphics/object_hierarchy.eps}
 
@@ -197,7 +211,7 @@
 
 \stepcounter{subsection}
 {\newpage\clearpage
-\lthtmlfigureA{figure177}%
+\lthtmlfigureA{figure222}%
 \begin{figure}\centering
 \includegraphics[scale=0.7]{graphics/message_basic.eps}
 
@@ -206,7 +220,7 @@
 \lthtmlcheckvsize\clearpage}
 
 {\newpage\clearpage
-\lthtmlfigureA{lstlisting185}%
+\lthtmlfigureA{lstlisting230}%
 \begin{lstlisting}[caption={Usage of Python objects for representing
 global and local options of a OPC XML-DA compliant SOAP message}
                    ,label=ex_message_basic] 
@@ -217,7 +231,7 @@ item_list,global_options = xda.Read([item], ItemPath='test_path')
 \lthtmlcheckvsize\clearpage}
 
 {\newpage\clearpage
-\lthtmlfigureA{lstlisting192}%
+\lthtmlfigureA{lstlisting237}%
 \begin{lstlisting}[caption={Assigning Global Options to a PyOPC 
 Client Instance}
                    ,label=ex_global]
@@ -230,7 +244,7 @@ xda = XDAClient(ReturnErrorText=False,
 \lthtmlcheckvsize\clearpage}
 
 {\newpage\clearpage
-\lthtmlfigureA{lstlisting199}%
+\lthtmlfigureA{lstlisting244}%
 \begin{lstlisting}[caption={Accessing the PyOPC ItemContainer Object}
                    ,label=ex_itemcontainer] 
 from PyOPC.OPCContainers import *
@@ -243,7 +257,7 @@ maxage = item.MaxAge
 \lthtmlcheckvsize\clearpage}
 
 {\newpage\clearpage
-\lthtmlfigureA{lstlisting215}%
+\lthtmlfigureA{lstlisting260}%
 \begin{lstlisting}[caption={Handling Qualified Names (QNames) with PyOPC}
                    ,label=ex_qnames] 
 from PyOPC.utils import *
@@ -256,7 +270,7 @@ url, name = qn2.URI, qn2.name
 \lthtmlcheckvsize\clearpage}
 
 {\newpage\clearpage
-\lthtmlfigureA{lstlisting228}%
+\lthtmlfigureA{lstlisting273}%
 \begin{lstlisting}[caption={Creating and Accessing PyOPC Properties}
                    ,label=ex_properties] 
 p1 = OPCProperty(Name = QName(NS_XDA,'accessRights'),
@@ -272,7 +286,7 @@ print p2.Description
 \lthtmlcheckvsize\clearpage}
 
 {\newpage\clearpage
-\lthtmlfigureA{table243}%
+\lthtmlfigureA{table288}%
 \begin{table}\centering
 \includegraphics[scale=0.7]{graphics/dataconv.eps}
 
@@ -284,7 +298,7 @@ print p2.Description
 \stepcounter{section}
 \stepcounter{subsection}
 {\newpage\clearpage
-\lthtmlfigureA{lstlisting520}%
+\lthtmlfigureA{lstlisting565}%
 \begin{lstlisting}[caption={Sample client code based on the PyOPC XDAClient 
 module}
                    ,label=ex_xdaclient] 
@@ -310,7 +324,7 @@ print_options(xda.Read([ItemContainer(ItemName='simple_item',
 
 \stepcounter{subsection}
 {\newpage\clearpage
-\lthtmlfigureA{lstlisting535}%
+\lthtmlfigureA{lstlisting580}%
 \begin{lstlisting}[caption={Sample client code based on the PyOPC TWXDAClient 
 module}
                    ,label=ex_twxdaclient] 
@@ -357,7 +371,7 @@ reactor.run()
 
 \stepcounter{section}
 {\newpage\clearpage
-\lthtmlfigureA{figure651}%
+\lthtmlfigureA{figure696}%
 \begin{figure}\centering
 \includegraphics[scale=0.7]{graphics/opc_proxy.eps}
 
@@ -366,7 +380,7 @@ reactor.run()
 \lthtmlcheckvsize\clearpage}
 
 {\newpage\clearpage
-\lthtmlfigureA{figure659}%
+\lthtmlfigureA{figure704}%
 \begin{figure}\centering
 \includegraphics[scale=0.7]{graphics/server_hierarchy.eps}
 
@@ -375,7 +389,7 @@ reactor.run()
 \lthtmlcheckvsize\clearpage}
 
 {\newpage\clearpage
-\lthtmlfigureA{lstlisting672}%
+\lthtmlfigureA{lstlisting717}%
 \begin{lstlisting}[caption={Simple OPC XML-DA Server}
                    ,label=ex_simple_server] 
 import random
@@ -400,7 +414,7 @@ return super(MyXDAServer, self).GetStatus((IPH,inOptions,outOptions))
 \lthtmlcheckvsize\clearpage}
 
 {\newpage\clearpage
-\lthtmlfigureA{figure676}%
+\lthtmlfigureA{figure721}%
 \begin{figure}\centering
 \includegraphics[scale=0.7]{graphics/opc_parameters.eps}
 
@@ -409,7 +423,7 @@ return super(MyXDAServer, self).GetStatus((IPH,inOptions,outOptions))
 \lthtmlcheckvsize\clearpage}
 
 {\newpage\clearpage
-\lthtmlfigureA{lstlisting687}%
+\lthtmlfigureA{lstlisting732}%
 \begin{lstlisting}[caption={Creating and Managing the ItemPairHolder object}
                    ,label=ex_IPH] 
 IPH = ItemPairHolder()
@@ -423,7 +437,7 @@ for inItem, outItem in IPH:
 \stepcounter{subsection}
 \stepcounter{subsection}
 {\newpage\clearpage
-\lthtmlfigureA{figure721}%
+\lthtmlfigureA{figure766}%
 \begin{figure}\centering
 \includegraphics[scale=0.7]{graphics/item_caching.eps}
 
@@ -432,7 +446,7 @@ for inItem, outItem in IPH:
 \lthtmlcheckvsize\clearpage}
 
 {\newpage\clearpage
-\lthtmlfigureA{figure732}%
+\lthtmlfigureA{figure777}%
 \begin{figure}\centering
 \includegraphics[scale=0.7]{graphics/pyopc_subs.eps}
 
@@ -442,7 +456,7 @@ for inItem, outItem in IPH:
 
 \stepcounter{subsection}
 {\newpage\clearpage
-\lthtmlfigureA{lstlisting766}%
+\lthtmlfigureA{lstlisting811}%
 \begin{lstlisting}[caption={Instantiating and Starting a PyOPC-based
 OPC XML-DA Server}
                    ,label=ex_start] 
@@ -458,7 +472,7 @@ reactor.run()
 \lthtmlcheckvsize\clearpage}
 
 {\newpage\clearpage
-\lthtmlfigureA{lstlisting771}%
+\lthtmlfigureA{lstlisting816}%
 \begin{lstlisting}[caption={Adding Multiple PyOPC Server Objects to
 One Twisted Resource}
                    ,label=ex_multiserver] 
@@ -472,7 +486,7 @@ root.putChild('srv3',MyXDAServer3())
 
 \stepcounter{subsection}
 {\newpage\clearpage
-\lthtmlfigureA{lstlisting778}%
+\lthtmlfigureA{lstlisting823}%
 \begin{lstlisting}[caption={PyOPC server based on the class 
 BasicXDAServer}
                    ,label=ex_basicxdaserver] 
@@ -489,7 +503,7 @@ class MyXDAServer(BasicXDAServer):
 
 \stepcounter{section}
 {\newpage\clearpage
-\lthtmlfigureA{table1083}%
+\lthtmlfigureA{table1128}%
 \begin{table}\centering
 \includegraphics[scale=0.9]{graphics/operations1.eps}
 
@@ -498,7 +512,7 @@ class MyXDAServer(BasicXDAServer):
 \lthtmlcheckvsize\clearpage}
 
 {\newpage\clearpage
-\lthtmlfigureA{table1089}%
+\lthtmlfigureA{table1134}%
 \begin{table}\centering
 \includegraphics[scale=0.9]{graphics/operations2.eps}
 
