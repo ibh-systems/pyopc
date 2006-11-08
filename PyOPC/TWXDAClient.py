@@ -26,7 +26,7 @@ def gen_twoperation(op):
             raise TypeError('Unknown options given: %s',str(Options))
 
         # Serialize typecode
-        SOAPMessage = str(ZSI.SoapWriter().serialize(x))
+        SOAPMessage = str(ZSI.SoapWriter().serialize(x,unique=True))
 
         headers = {
             'SOAPAction':'http://opcfoundation.org/webservices/XMLDA/1.0/'+op,

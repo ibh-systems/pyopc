@@ -380,7 +380,7 @@ class OPCOperationTest(unittest.TestCase, OPCOperation):
 
         # Now serialize and parse it and check again
         # Serialize typecode into string
-        sw = str(ZSI.SoapWriter().serialize(tc))
+        sw = str(ZSI.SoapWriter().serialize(tc,unique=True))
         ps = ZSI.ParsedSoap(sw)
         tc = ps.Parse(tc.typecode)
         rilist,rOptions = readfunc(tc)
@@ -398,7 +398,7 @@ class OPCOperationTest(unittest.TestCase, OPCOperation):
         self.failUnless(fillOptions.has_key('NoSuchOptionXYZ'))
 
         # Serialize typecode into string
-        sw = str(ZSI.SoapWriter().serialize(tc))
+        sw = str(ZSI.SoapWriter().serialize(tc,unique=True))
         psw=xml.dom.minidom.parseString(sw).toprettyxml()
 
         ODefaults.update(Options)

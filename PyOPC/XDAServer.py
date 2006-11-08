@@ -365,7 +365,7 @@ class XDAServer(resource.Resource, OPCOperation):
     def serialize_stage2(self, tc_out, request):
         ''' Serialize typecode and write SOAP message '''
         # serialize typecode
-        SOAPMessage = ZSI.SoapWriter().serialize(tc_out)
+        SOAPMessage = ZSI.SoapWriter().serialize(tc_out,unique=True)
 
         # Now write the SOAP message
         buf = str(SOAPMessage)
