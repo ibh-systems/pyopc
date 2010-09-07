@@ -8,7 +8,6 @@ from twisted.python import log
 from OPCBuffer import OPCBuffer
 # Should already be imported
 import xml.dom.minidom
-from xml.dom.ext import PrettyPrint
 
 
 # Import ZSI generated code
