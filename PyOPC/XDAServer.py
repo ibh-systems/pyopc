@@ -27,7 +27,6 @@ from OPCBuffer import OPCBuffer
 # Should already be imported
 import xml.dom.minidom
 
-
 # Import ZSI generated code
 import OpcXmlDaSrv_services
 

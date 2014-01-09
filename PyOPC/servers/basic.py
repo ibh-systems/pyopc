@@ -94,7 +94,7 @@ class BasicXDAServer(XDAServer):
                     WriteItem = ItemContainer()
                     self.OPCItemDict[key] = WriteItem
                 # Only write what is not None
-                if inItem.Value:
+                if inItem.Value is not None:
                     WriteItem.Value = inItem.Value
                 if inItem.Timestamp:
                     WriteItem.Timestamp = inItem.Timestamp
